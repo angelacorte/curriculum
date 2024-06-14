@@ -1,31 +1,25 @@
-name: compile and release slides
+name: Build LaTeX and deploy on GitHub Releases
 on:
   push:
-    branches:
-      - main
-      - master
+    tags: '*'
+    branches-ignore:
+      - 'autodelivery**'
+      - 'bump-**'
+      - 'renovate/**'
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'LICENSE'
+      - 'renovate.json'
+  pull_request:
+  workflow_dispatch:
 
 jobs:
-  compile:
+  success:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.TOKEN }}
-          fetch-depth: 0
-
-      - name: Build latex
-        uses: xu-cheng/latex-action@v3
-        with:
-          root_file: curriculum_vitae.tex
-
-      - name: Prepare assets
-        run: |
-          mkdir -p assets
-          cp ./*.pdf ./assets/
-
-      - name: semver
-        uses: anitvam/conventionalcommit-semantic-releasing@v0.7.11
+      - uses: DanySK/compile-and-publish-all-latex@2.0.27
         with:
           token: ${{ secrets.TOKEN }}
