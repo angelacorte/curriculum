@@ -1,0 +1,77 @@
+% Change the page layout if you need to
+%\geometry{left=1cm,right=9cm,marginparwidth=6.8cm,marginparsep=1.2cm,top=1cm,bottom=1cm}
+\geometry{left=1cm,right=11cm,marginparwidth=9cm,marginparsep=1cm,top=1cm,bottom=1cm}
+
+% Change the font if you want to.
+
+% If using pdflatex:
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{hyperref}
+\usepackage[english]{babel}
+\usepackage[square,numbers]{natbib}
+
+% If using xelatex or lualatex:
+% \setmainfont{Lato}
+
+% Change the colours if you want to
+\definecolor{Primary}{HTML}{5BABBB}
+\definecolor{SlateGrey}{HTML}{2E2E2E}
+\definecolor{LightGrey}{HTML}{666666}
+\colorlet{heading}{Primary}
+\colorlet{accent}{Primary}
+\colorlet{emphasis}{SlateGrey}
+\colorlet{body}{LightGrey}
+
+% Change the bullets for itemize and rating marker
+% for \cvskill if you want to
+\renewcommand{\itemmarker}{{\small\textbullet}}
+\renewcommand{\ratingmarker}{\faCircle}
+
+\newcommand{\latex}{\LaTeX\xspace}
+
+\newcommand{\cvblock}[4]{
+    \makebox[\linewidth][c]{
+        \parbox[l]{0.5\linewidth}{
+            {{\large\color{emphasis}#1}\par
+            \smallskip
+            \textbf{\color{accent}#2}}\par
+            \smallskip
+        }
+        \makebox[0.5\linewidth][c]{
+            \small
+            \begin{minipage}{0.2\linewidth}
+                \raggedright \faCalendar \hspace{0.5em}#3
+            \end{minipage}
+            %\parbox[r]{0.3\linewidth}{\faCalendar \hspace{0.5em}#3}%
+            \ifstrequal{#4}{}{}{\parbox[r]{0.2\linewidth}{\faMapMarker\hspace{0.5em}#4}}\par
+        }
+    }
+}
+
+\newcommand{\cvskillblock}[2]{
+    \makebox[\linewidth][c]{
+        \parbox[c]{0.4\linewidth}{
+            \cvsubsection{#1}
+            \medskip            
+        }
+        \parbox[l]{0.6\linewidth}{
+            #2
+            \medskip            
+        }
+    }
+}
+
+\newcommand{\calendaritem}[1]{
+    \small
+    \begin{minipage}{\linewidth}
+        
+    \end{minipage}
+    %\small\parbox[l]{\linewidth}{ \faCalendar \hspace{0.1em} {#1}}
+}
+
+\newcommand{\notesymbol}{\faInfoCircle}
+\newcommand{\worknote}{
+    \small \notesymbol \hspace{0.5em} Work done during the studies
+}
