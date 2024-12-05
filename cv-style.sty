@@ -10,8 +10,30 @@
 \usepackage{lmodern}
 \usepackage{hyperref}
 \usepackage[english]{babel}
-\usepackage[square,numbers]{natbib}
+\usepackage[
+backend=biber,
+style=ieee,
+sorting=ynt,
+%citestyle=numeric,
+%entrykey=false,
+%annotation=false,
+]{biblatex}
 
+% ====== Bibliografy custom rendering ======
+\defbibcheck{notpub}{\iffieldequalstr{annotation}{notpub}{}{\skipentry}}
+\defbibcheck{pub}{\iffieldequalstr{annotation}{pub}{}{\skipentry}}
+\defbibcheck{other}{
+    \iffieldequalstr{annotation}{pub}
+        {\skipentry}
+        {\iffieldequalstr{annotation}{notpub}{\skipentry}{}}
+}
+
+% \renewcommand*{\bibfont}{\normalfont\small}
+% \setlength\bibitemsep{1.5\itemsep}
+% \renewcommand*{\bibitemsep}{\addvspace{2\baselineskip}}
+
+\addbibresource{biblio.bib}
+% =============================
 % If using xelatex or lualatex:
 % \setmainfont{Lato}
 
