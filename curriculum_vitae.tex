@@ -51,8 +51,7 @@
 
     \cvblock{Accounting degree in Business and Foreign Language}{ITS "A. Oriani"}{2017}{Faenza, Italy}
 
-    \divider
-
+    \divider 
 \end{adjustwidth}
 
 \begin{adjustwidth}{}{-9cm}
@@ -64,6 +63,9 @@
     \divider
     \cvsubsection{\color{subheading}Accepted -- {\small Available soon}}
     \printbibliography[heading=none, check=notpub]
+    \ifthenelse{\equal{\arabic{enumiv}}{0}}{Work in progress}{
+        \printbibliography[heading=none, check=notpub]
+        }
 
     \divider
 
