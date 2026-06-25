@@ -171,6 +171,15 @@ def serialize_entry(entry: BibEntry) -> str:
 def serialize_bibliography(entries: Iterable[BibEntry]) -> str:
     return "\n\n".join(serialize_entry(entry) for entry in entries) + "\n"
 
+def entry_sort_key(entry: BibEntry) -> tuple[int, str, str]:
+    year_value = entry.fields.get("year", "").strip()
+    match = re.search(r"\d{4}", year_value)
+    year = int(match.group(0)) if match else 9999
+    return year, normalize_title(entry.fields.get("title", "")), entry.key
+
+
+def sort_entries_chronologically(entries: Iterable[BibEntry]) -> list[BibEntry]:
+    return sorted(entries, key=entry_sort_key)
 
 def make_key(entry: BibEntry) -> str:
     year = entry.fields.get("year", "unknown")
@@ -541,6 +550,7 @@ def main() -> int:
     incoming_entries.extend(fetch_crossref_author_entries(args.author))
 
     updated_entries = dedupe_and_merge(existing_entries, incoming_entries)
+    updated_entries = sort_entries_chronologically(updated_entries)
     updated_content = serialize_bibliography(updated_entries)
 
     if updated_content != original_content:
