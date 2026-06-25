@@ -8,6 +8,7 @@ import re
 import sys
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,14 +30,28 @@ class BibEntry:
     def title_key(self) -> str:
         return normalize_title(self.fields.get("title", ""))
 
+    @property
+    def arxiv_id(self) -> str:
+        return normalize_arxiv_id(self.fields.get("eprint", "") or self.fields.get("arxivid", ""))
+
 
 SOURCE_PRIORITY = {
     "dblp": 0,
     "orcid-crossref": 1,
     "crossref": 2,
-    "orcid": 3,
+    "arxiv": 3,
+    "orcid": 4,
     "existing": -1,
 }
+def normalize_arxiv_id(value: str) -> str:
+    value = value.strip()
+    if not value:
+        return ""
+
+    value = re.sub(r"^https?://arxiv\.org/(abs|pdf)/", "", value, flags=re.IGNORECASE)
+    value = re.sub(r"^arxiv:", "", value, flags=re.IGNORECASE)
+    value = re.sub(r"\.pdf$", "", value, flags=re.IGNORECASE)
+    return value.strip()
 
 
 def http_get_json(url: str) -> dict:
@@ -216,6 +231,9 @@ def merge_entries(existing: BibEntry, incoming: BibEntry) -> BibEntry:
     for name, value in incoming_fields.items():
         if not value:
             continue
+        if name == "doi" and value and incoming.source in {"dblp", "orcid-crossref", "crossref"}:
+            fields[name] = value
+            continue
         if name not in fields or not fields[name].strip():
             fields[name] = value
 
@@ -240,6 +258,7 @@ def dedupe_and_merge(existing_entries: list[BibEntry], incoming_entries: list[Bi
     result: list[BibEntry] = []
     by_doi: dict[str, int] = {}
     by_title: dict[str, int] = {}
+    by_arxiv_id: dict[str, int] = {}
     used_keys = {entry.key for entry in existing_entries}
 
     for entry in existing_entries:
@@ -249,6 +268,8 @@ def dedupe_and_merge(existing_entries: list[BibEntry], incoming_entries: list[Bi
             by_doi[entry.doi] = index
         if entry.title_key:
             by_title[entry.title_key] = index
+        if entry.arxiv_id:
+            by_arxiv_id[entry.arxiv_id] = index
 
     for incoming in sorted(
             incoming_entries,
@@ -258,6 +279,8 @@ def dedupe_and_merge(existing_entries: list[BibEntry], incoming_entries: list[Bi
 
         if incoming.doi and incoming.doi in by_doi:
             match_index = by_doi[incoming.doi]
+        elif incoming.arxiv_id and incoming.arxiv_id in by_arxiv_id:
+            match_index = by_arxiv_id[incoming.arxiv_id]
         elif incoming.title_key and incoming.title_key in by_title:
             match_index = by_title[incoming.title_key]
 
@@ -268,6 +291,8 @@ def dedupe_and_merge(existing_entries: list[BibEntry], incoming_entries: list[Bi
                 by_doi[merged.doi] = match_index
             if merged.title_key:
                 by_title[merged.title_key] = match_index
+            if merged.arxiv_id:
+                by_arxiv_id[merged.arxiv_id] = match_index
             continue
 
         fields = ensure_doi_field(OrderedDict(incoming.fields))
@@ -290,8 +315,108 @@ def dedupe_and_merge(existing_entries: list[BibEntry], incoming_entries: list[Bi
             by_doi[new_entry.doi] = index
         if new_entry.title_key:
             by_title[new_entry.title_key] = index
+        if new_entry.arxiv_id:
+            by_arxiv_id[new_entry.arxiv_id] = index
 
     return result
+def fetch_arxiv_entries(author_name: str) -> list[BibEntry]:
+    query = urllib.parse.urlencode(
+        {
+            "search_query": f'au:"{author_name}"',
+            "start": "0",
+            "max_results": "50",
+            "sortBy": "submittedDate",
+            "sortOrder": "descending",
+        }
+    )
+    url = f"https://export.arxiv.org/api/query?{query}"
+
+    try:
+        content = http_get_text(url)
+    except Exception as error:
+        print(f"Warning: could not fetch arXiv entries: {error}", file=sys.stderr)
+        return []
+
+    namespaces = {
+        "atom": "http://www.w3.org/2005/Atom",
+        "arxiv": "http://arxiv.org/schemas/atom",
+    }
+
+    try:
+        root = ET.fromstring(content)
+    except ET.ParseError as error:
+        print(f"Warning: could not parse arXiv entries: {error}", file=sys.stderr)
+        return []
+
+    entries: list[BibEntry] = []
+
+    for item in root.findall("atom:entry", namespaces):
+        title_node = item.find("atom:title", namespaces)
+        if title_node is None or not title_node.text:
+            continue
+
+        title = re.sub(r"\s+", " ", title_node.text).strip()
+        if not title:
+            continue
+
+        authors = []
+        for author in item.findall("atom:author", namespaces):
+            name_node = author.find("atom:name", namespaces)
+            if name_node is not None and name_node.text:
+                authors.append(re.sub(r"\s+", " ", name_node.text).strip())
+
+        published_node = item.find("atom:published", namespaces)
+        year = ""
+        if published_node is not None and published_node.text:
+            match = re.search(r"\d{4}", published_node.text)
+            if match:
+                year = match.group(0)
+
+        id_node = item.find("atom:id", namespaces)
+        arxiv_id = normalize_arxiv_id(id_node.text if id_node is not None and id_node.text else "")
+
+        doi_node = item.find("arxiv:doi", namespaces)
+        doi = normalize_doi(doi_node.text if doi_node is not None and doi_node.text else "")
+
+        journal_ref_node = item.find("arxiv:journal_ref", namespaces)
+        journal_ref = ""
+        if journal_ref_node is not None and journal_ref_node.text:
+            journal_ref = re.sub(r"\s+", " ", journal_ref_node.text).strip()
+
+        fields: OrderedDict[str, str] = OrderedDict()
+        if authors:
+            fields["author"] = " and ".join(latex_escape(author) for author in authors)
+        fields["title"] = latex_escape(title)
+        if year:
+            fields["year"] = year
+        if doi:
+            fields["doi"] = doi
+        if arxiv_id:
+            fields["eprint"] = arxiv_id
+            fields["archiveprefix"] = "arXiv"
+            fields["primaryclass"] = "cs.DC"
+            fields["url"] = f"https://arxiv.org/abs/{arxiv_id}"
+        if journal_ref:
+            fields["note"] = latex_escape(journal_ref)
+        fields["annote"] = "pub"
+
+        entry = BibEntry(
+            key="",
+            entry_type="misc",
+            fields=fields,
+            source="arxiv",
+        )
+
+        entries.append(
+            BibEntry(
+                key=make_key(entry),
+                entry_type=entry.entry_type,
+                fields=entry.fields,
+                source=entry.source,
+            )
+        )
+
+    return entries
 
 
 def fetch_dblp_entries(dblp_pid: str) -> list[BibEntry]:
@@ -532,7 +657,7 @@ def main() -> int:
     parser.add_argument("--bib", required=True, help="Path to biblio.bib")
     parser.add_argument("--dblp-pid", required=True, help="DBLP author PID, for example 392/6452")
     parser.add_argument("--orcid", required=True, help="ORCID identifier")
-    parser.add_argument("--author", required=True, help="Author name for Crossref matching")
+    parser.add_argument("--author", required=True, help="Author name for Crossref and arXiv matching")
     args = parser.parse_args()
 
     bib_path = Path(args.bib)
@@ -548,6 +673,7 @@ def main() -> int:
     incoming_entries.extend(fetch_dblp_entries(args.dblp_pid))
     incoming_entries.extend(fetch_orcid_entries(args.orcid))
     incoming_entries.extend(fetch_crossref_author_entries(args.author))
+    incoming_entries.extend(fetch_arxiv_entries(args.author))
 
     updated_entries = dedupe_and_merge(existing_entries, incoming_entries)
     updated_entries = sort_entries_chronologically(updated_entries)
