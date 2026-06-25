@@ -1,0 +1,46 @@
+name: Update bibliography from sources
+
+on:
+  schedule:
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-bibliography:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Update bibliography from DBLP, ORCID, and Crossref
+        run: |
+          python scripts/update_biblio_from_sources.py \
+            --bib biblio.bib \
+            --dblp-pid 392/6452 \
+            --orcid 0009-0000-3650-7450 \
+            --author "Angela Corte"
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: autobib/update-publications
+          delete-branch: true
+          title: "Update publications bibliography"
+          commit-message: "Update publications bibliography"
+          body: |
+            Automated bibliography update from DBLP, ORCID, and Crossref.
+
+            Entries are deduplicated by DOI first, then by normalized title.
+          labels: |
+            autobib
+            automerge
