@@ -1,0 +1,17 @@
+pull_request_rules:
+  - name: Approve and merge automatic bibliography updates once CI passes
+    conditions:
+      - base=main
+      - author=github-actions[bot]
+      - label=autobib
+      - label=automerge
+      - check-success=success
+      - -draft
+      - -conflict
+    actions:
+      review:
+        type: APPROVE
+        message: Automatic bibliography update approved after CI passed.
+      merge:
+        method: squash
+        commit_message_template: title+body
