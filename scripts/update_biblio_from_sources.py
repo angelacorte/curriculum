@@ -71,6 +71,50 @@ def normalize_doi(value: str) -> str:
     return value.strip().rstrip(".")
 
 
+def extract_doi_from_text(value: str) -> str:
+    value = value.strip()
+    if not value:
+        return ""
+
+    normalized = normalize_doi(value)
+    if normalized.startswith("10."):
+        return normalized
+
+    match = re.search(
+        r"(?:https?://(?:dx\.)?doi\.org/|doi:\s*)?(10\.\d{4,9}/[^\s{}\\\"]+)",
+        value,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return ""
+
+    return normalize_doi(match.group(1))
+
+
+def infer_doi_from_fields(fields: OrderedDict[str, str]) -> str:
+    for name in ("doi", "ee", "url"):
+        doi = extract_doi_from_text(fields.get(name, ""))
+        if doi:
+            return doi
+    return ""
+
+
+def ensure_doi_field(fields: OrderedDict[str, str]) -> OrderedDict[str, str]:
+    doi = infer_doi_from_fields(fields)
+    if doi and not fields.get("doi", "").strip():
+        updated = OrderedDict()
+        inserted = False
+        for name, value in fields.items():
+            updated[name] = value
+            if name == "title":
+                updated["doi"] = doi
+                inserted = True
+        if not inserted:
+            updated["doi"] = doi
+        return updated
+    return fields
+
+
 def normalize_title(value: str) -> str:
     value = value.lower()
     value = re.sub(r"[{}\\]", "", value)
@@ -158,12 +202,15 @@ def unique_key(base_key: str, used: set[str]) -> str:
 def merge_entries(existing: BibEntry, incoming: BibEntry) -> BibEntry:
     fields = OrderedDict(existing.fields)
 
-    for name, value in incoming.fields.items():
+    incoming_fields = ensure_doi_field(OrderedDict(incoming.fields))
+
+    for name, value in incoming_fields.items():
         if not value:
             continue
         if name not in fields or not fields[name].strip():
             fields[name] = value
 
+    fields = ensure_doi_field(fields)
     fields["annote"] = "pub"
 
     preferred_source = (
@@ -214,7 +261,7 @@ def dedupe_and_merge(existing_entries: list[BibEntry], incoming_entries: list[Bi
                 by_title[merged.title_key] = match_index
             continue
 
-        fields = OrderedDict(incoming.fields)
+        fields = ensure_doi_field(OrderedDict(incoming.fields))
         fields["annote"] = "pub"
 
         base_key = incoming.key or make_key(incoming)
@@ -250,7 +297,7 @@ def fetch_dblp_entries(dblp_pid: str) -> list[BibEntry]:
     normalized: list[BibEntry] = []
 
     for entry in entries:
-        fields = OrderedDict(entry.fields)
+        fields = ensure_doi_field(OrderedDict(entry.fields))
         fields["annote"] = "pub"
         normalized.append(
             BibEntry(
@@ -308,6 +355,7 @@ def crossref_item_to_entry(item: dict, source: str) -> BibEntry | None:
     if url:
         fields["url"] = url
 
+    fields = ensure_doi_field(fields)
     fields["annote"] = "pub"
 
     entry_type = "inproceedings"
@@ -446,6 +494,7 @@ def fetch_orcid_entries(orcid: str) -> list[BibEntry]:
             fields["year"] = year
         if doi:
             fields["doi"] = doi
+        fields = ensure_doi_field(fields)
         fields["annote"] = "pub"
 
         entry = BibEntry(
