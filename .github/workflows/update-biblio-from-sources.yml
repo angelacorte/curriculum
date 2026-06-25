@@ -28,10 +28,10 @@ jobs:
             --bib biblio.bib \
             --dblp-pid 392/6452 \
             --orcid 0009-0000-3650-7450 \
-            --author "Angela Corte"
+            --author "Angela Cortecchia"
 
       - name: Create pull request
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           branch: autobib/update-publications
           delete-branch: true

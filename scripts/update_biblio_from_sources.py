@@ -44,24 +44,25 @@ def http_get_json(url: str) -> dict:
         url,
         headers={
             "User-Agent": "curriculum-bib-updater/1.0 "
-                          "(https://github.com/angelacorte/curriculum)"
+                          "(https://github.com/angelacorte/curriculum)",
+            "Accept": "application/json",
         },
     )
     with urllib.request.urlopen(req, timeout=30) as response:
-        return json.loads(response.read().decode("utf-8"))
-
+        body = response.read().decode("utf-8")
+        return json.loads(body)
 
 def http_get_text(url: str) -> str:
     req = urllib.request.Request(
         url,
         headers={
             "User-Agent": "curriculum-bib-updater/1.0 "
-                          "(https://github.com/angelacorte/curriculum)"
+                          "(https://github.com/angelacorte/curriculum)",
+            "Accept": "text/plain, application/x-bibtex, */*",
         },
     )
     with urllib.request.urlopen(req, timeout=30) as response:
         return response.read().decode("utf-8")
-
 
 def normalize_doi(value: str) -> str:
     value = value.strip().lower()
