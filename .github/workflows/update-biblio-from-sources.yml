@@ -42,5 +42,6 @@ jobs:
 
             Entries are deduplicated by DOI first, then by normalized title.
           labels: |
+            queued
             autobib
             automerge
