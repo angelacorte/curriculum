@@ -17,10 +17,13 @@ on:
 
 jobs:
   success:
+
+    name: Build and publish CV documents
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: DanySK/compile-and-publish-all-latex@2.3.7
+      - name: Compile and publish the CV and full publication list
+        uses: DanySK/compile-and-publish-all-latex@2.3.7
         with:
           token: ${{ secrets.TOKEN }}
