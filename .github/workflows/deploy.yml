@@ -24,6 +24,6 @@ jobs:
       contents: write
     steps:
       - name: Compile and publish the CV and full publication list
-        uses: DanySK/compile-and-publish-all-latex@2.3.7
+        uses: DanySK/compile-and-publish-all-latex@2.3.9
         with:
           token: ${{ secrets.TOKEN }}
